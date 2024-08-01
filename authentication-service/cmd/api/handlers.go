@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,32 +11,64 @@ import (
 func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 	//
 	var requestPayload struct {
-		email    string `json:"email"`
-		password string `json:"password"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
-	err := app.ReadJSON(w, r, &requestPayload)
+	err := app.ReadJSON(w, r, &requestPayload) //TODO: lowercase r
 	if err != nil {
 		app.errorJSON(w, err, http.StatusBadRequest)
 		return
 	}
 
 	// validate the request payload against the database
-	user, err := app.Models.User.GetByEmail(requestPayload.email)
+	user, err := app.Models.User.GetByEmail(requestPayload.Email)
 	if err != nil {
 		app.errorJSON(w, errors.New("invalid Credentials"), http.StatusUnauthorized)
 		return
 	}
-	valid, err := user.PasswordMatches(requestPayload.password)
+	valid, err := user.PasswordMatches(requestPayload.Password)
 	if err != nil || !valid {
-		app.errorJSON(w, errors.New("invalid Credentials"), http.StatusUnauthorized)
+		app.errorJSON(w, errors.New("invalid Credentials"), http.StatusBadRequest)
+		return
+	}
+
+	//log authentication
+	err = app.logRequest("authentication", fmt.Sprintf("%s logged in", user.Email))
+	if err != nil {
+		app.errorJSON(w, err)
 		return
 	}
 
 	payload := jsonResponse{
 		Error:   false,
-		Message: fmt.Sprintf("logged in as %s", user.Email),
+		Message: fmt.Sprintf("Logged in as %s", user.Email),
 		Data:    user,
 	}
 
 	app.WriteJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) logRequest(name, data string) error {
+	var entry struct {
+		Name string `json:"name"`
+		Data string `json:"data"`
+	}
+
+	entry.Name = name
+	entry.Data = data
+
+	jsonData, _ := json.MarshalIndent(entry, "", "\t")
+	logServiceURL := "http://logger-service/log"
+
+	request, err := http.NewRequest("POST", logServiceURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+
+	client := &http.Client{}
+	_, err = client.Do(request)
+	if err != nil {
+		return err
+	}
+	return nil
 }
