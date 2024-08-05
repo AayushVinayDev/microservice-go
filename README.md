@@ -11,6 +11,9 @@ This project is meant for learning experience to understand, basic microservices
 The diagram illustrates the core components of the system:
 
 
+![Image description](diagram.png)
+
+
 1. User Interface: The entry point for user interactions.
 2. Broker Service: Handles message queuing and distribution.
 3. Listener Service: Consumes messages from the broker and processes them.
@@ -29,6 +32,8 @@ The diagram illustrates the core components of the system:
 
 
 ## Deployment
+
+![Image description](working.png)
 
 To deploy this project locally
 
